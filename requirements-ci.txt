@@ -2,6 +2,7 @@
 # 更新時請在乾淨環境跑完整離線測試，並連同這個檔案一起 review。
 pip==26.2.1
 setuptools==84.0.0
+packaging==26.3
 numpy==2.4.6
 pandas==3.0.5
 python-dateutil==2.9.0.post0
