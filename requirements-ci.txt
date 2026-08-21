@@ -1,0 +1,13 @@
+# Python 3.11 CI 的完整解析結果；應用程式的相容範圍仍以 requirements.txt 為準。
+# 更新時請在乾淨環境跑完整離線測試，並連同這個檔案一起 review。
+pip==26.2.1
+setuptools==84.0.0
+numpy==2.4.6
+pandas==3.0.5
+python-dateutil==2.9.0.post0
+requests==2.34.2
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.19
+urllib3==2.7.0
+six==1.17.0
