@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
-"""CI 的安全與可重現性契約（純文字、離線）。
+"""檢查 CI 使用的 Action 與 Python 套件是否固定版本。
 
-workflow 本身也是 release gate 的一部分；若 Action 或 Python 套件退回浮動版本，
-同一個 commit 日後可能執行不同程式碼。這些測試刻意不引入 YAML parser，避免為了
-檢查 CI 再增加一組 CI 依賴。
+若這些外部依賴未固定，同一個 commit 在不同時間可能使用不同版本，
+導致原本通過的 CI 日後失敗。發生問題時，我們也難以判斷原因來自
+專案程式碼，還是外部依賴更新。
+
+因此，本測試要求 CI 固定外部依賴版本，讓執行環境可以重現，測試
+結果也比較容易追查。
 """
+
+
 from __future__ import annotations
 
 import re
