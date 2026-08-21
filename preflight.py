@@ -143,6 +143,8 @@ REQUIRED_PUBLIC_FILES = (
     "TAIWAN_MARKET_RULES.md",
     ".env.example",
     ".gitignore",
+    ".coderabbit.yaml",
+    ".github/CODEOWNERS",
     "requirements.txt",
     "requirements-ci.txt",
     "outputs/README.md",

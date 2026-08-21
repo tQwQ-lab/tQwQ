@@ -1,0 +1,101 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "en-US"
+
+tone_instructions: >
+  Be concise and evidence-first. Separate confirmed defects, research risks,
+  and optional suggestions. Do not infer correctness from improved performance.
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  review_details: true
+  review_progress: true
+  high_level_summary: true
+  assess_linked_issues: true
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  sequence_diagrams: false
+  in_progress_fortune: false
+  poem: false
+  enable_prompt_for_ai_agents: false
+
+  auto_review:
+    enabled: true
+    drafts: true
+    auto_incremental_review: true
+    base_branches:
+      - "review-main"
+
+  path_instructions:
+    - path: "{research,universes,backtest,data,evaluation,execution,factor_engine,strategies,strategy_kit}/**/*.py"
+      instructions: |
+        Treat point-in-time correctness and research provenance as correctness
+        requirements. Flag changes that:
+
+        - use observations unavailable at the decision timestamp;
+        - apply a current or end-of-period universe to historical dates;
+        - let month M candidate selection use month M information;
+        - fill late-reported data backward or across unavailable dates;
+        - allow a missing PIT provider to remain formally evidence-eligible;
+        - bypass snapshot, price-integrity, holdout, or provenance gates; or
+        - execute a close-confirmed signal before the next tradable session.
+
+        Candidate membership for month M must use only the complete calendar
+        month M-1. Missing required snapshots must fail closed. Changes to these
+        rules require an offline regression test that reproduces the unsafe case.
+
+    - path: "*.py"
+      instructions: |
+        Review timestamp alignment, snapshot identity, cache identity, mutable
+        global configuration, fail-closed behavior, and provenance. Do not treat
+        a successful backtest or higher performance as evidence of correctness.
+
+    - path: "tests/**/*.py"
+      instructions: |
+        Tests use unittest, not pytest. They must remain offline and mock all
+        FinMind, TWSE, and TPEx HTTP access. PIT and integrity fixes require
+        negative regression tests showing that unsafe inputs are rejected or
+        explicitly downgraded.
+
+    - path: ".github/workflows/**"
+      instructions: |
+        Keep permissions read-only, pin third-party Actions to full commit SHAs,
+        use Python 3.11 and requirements-ci.txt, and never fetch market data or
+        expose secrets in CI.
+
+    - path: "**/*.md"
+      instructions: |
+        Check that claims match enforced behavior and disclosed limitations.
+        English is canonical. zh-TW documents are translations; legal
+        translations must not claim independent legal authority.
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+
+issue_enrichment:
+  auto_enrich:
+    enabled: false
+  planning:
+    enabled: false
+  labeling:
+    auto_apply_labels: false
