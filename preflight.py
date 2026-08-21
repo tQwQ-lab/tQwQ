@@ -144,6 +144,7 @@ REQUIRED_PUBLIC_FILES = (
     ".env.example",
     ".gitignore",
     "requirements.txt",
+    "requirements-ci.txt",
     "outputs/README.md",
     "preflight.py",
     "tests/test_preflight.py",
