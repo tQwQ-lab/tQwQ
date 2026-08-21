@@ -58,6 +58,8 @@ def _requirements(path: Path) -> list[Requirement]:
 
 def _exact_pin(requirement: Requirement) -> str:
     """Return an exact pinned version or reject the requirement."""
+    if requirement.marker is not None:
+        raise AssertionError(f"CI dependency must not use a marker: {requirement}")
     specs = list(requirement.specifier)
     if (
         len(specs) != 1
@@ -150,6 +152,13 @@ class CIDependencyContractTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "exactly pinned"):
             _validate_dependency_contract(
                 [Requirement("packaging>=26")], [Requirement("packaging==26.*")]
+            )
+
+    def test_dependency_contract_rejects_marker_qualified_ci_pin(self):
+        with self.assertRaisesRegex(AssertionError, "must not use a marker"):
+            _validate_dependency_contract(
+                [Requirement("numpy>=2.0")],
+                [Requirement('numpy==2.4.6; python_version < "3.11"')],
             )
 
     def test_dependency_contract_rejects_missing_ci_dependency(self):
