@@ -345,6 +345,41 @@ def _market_benchmark(equity: pd.DataFrame) -> Dict[str, Any]:
 
 
 # ── 主流程 ────────────────────────────────────────────────────────────────
+
+def build_candidate_spec(*, strategy_id: str,
+                         params: Optional[Mapping[str, Any]] = None,
+                         policy_spec: Optional[StrategyPositionPolicySpec] = None,
+                         eligibility_rule_id: str) -> CandidateSpec:
+    """規則身分的**唯一建構點**:只吃宣告性輸入,不吃 panel、不吃資料窗。
+
+    抽出來的理由是 `reveal_locked_os` 需要在**載入任何 OS 之前**算出
+    `strategy_rule_hash`。那件事之所以可行,是因為這些欄位全部與資料無關:
+    strategy_id / version / signal_params / portfolio_params / exit_params /
+    universe_rule / code_fingerprint,加上 `eligibility_rule_id`(訊號欄的常數,
+    由呼叫端傳入)。改 `is_ratio`、換 fixture 都不會改變 hash。
+
+    前置閘門與 `run_golden_path` 共用這一份實作,所以兩邊算出來的必然是同一個
+    hash —— 分成兩份寫法遲早會分岔,而分岔的後果是閘門放行它該擋的東西。
+
+    `provenance.git_state()` 的鍵是 `git_commit`,不是 `commit`。曾經取錯鍵 →
+    指紋永遠是空字串 → 規則從來沒有綁到程式碼版本,而預設值 "" 合法,所以沒有
+    任何地方會報錯。
+    """
+    strategy = registry.resolve(strategy_id)
+    spec = policy_spec if policy_spec is not None else StrategyPositionPolicySpec()
+    return CandidateSpec(
+        strategy_id=strategy_id,
+        strategy_version=str(getattr(strategy, "version", "unknown")),
+        signal_params=dict(params or strategy.default_parameters()),
+        portfolio_params={k: v for k, v in spec.rules().items()
+                          if k not in ("hard_stop_pct", "max_hold_days")},
+        exit_params={"hard_stop_pct": spec.hard_stop_pct,
+                     "max_hold_days": spec.max_hold_days},
+        eligibility_rule_id=str(eligibility_rule_id),
+        code_fingerprint=str(provenance.git_state().get("git_commit", "")),
+    )
+
+
 def run_golden_path(*, strategy_id: str, fixture_name: str = "synthetic",
                     capital: str = "research", output_dir,
                     params: Optional[Mapping[str, Any]] = None,
@@ -431,20 +466,9 @@ def run_golden_path(*, strategy_id: str, fixture_name: str = "synthetic",
                 f"[fail-closed] 計分窗 [{lo.date()}, {hi.date()}] 內沒有訊號")
 
     spec = policy_spec
-    candidate = CandidateSpec(
-        strategy_id=strategy_id,
-        strategy_version=str(getattr(strategy, "version", "unknown")),
-        signal_params=dict(params or strategy.default_parameters()),
-        portfolio_params={k: v for k, v in spec.rules().items()
-                          if k not in ("hard_stop_pct", "max_hold_days")},
-        exit_params={"hard_stop_pct": spec.hard_stop_pct,
-                     "max_hold_days": spec.max_hold_days},
-        eligibility_rule_id=str(signals["eligibility_rule_id"].iloc[0]),
-        # `provenance.git_state()` 的鍵是 `git_commit`,不是 `commit`。
-        # 原本取錯鍵 → 這裡永遠是空字串 → 規則指紋從來沒有綁到程式碼版本,
-        # 而且因為預設值是 ""(合法),沒有任何地方會報錯。
-        code_fingerprint=str(provenance.git_state().get("git_commit", "")),
-    )
+    candidate = build_candidate_spec(
+        strategy_id=strategy_id, params=params, policy_spec=policy_spec,
+        eligibility_rule_id=str(signals["eligibility_rule_id"].iloc[0]))
     protocol = EvaluationProtocol(
         data_snapshot=str(getattr(config, "SNAPSHOT_END_DATE", "")),
         price_dataset=str(getattr(config, "PRICE_DATASET", "")),
