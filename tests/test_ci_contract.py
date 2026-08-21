@@ -56,6 +56,36 @@ def _requirements(path: Path) -> list[Requirement]:
     return parsed
 
 
+def _exact_pin(requirement: Requirement) -> str:
+    """Return an exact pinned version or reject the requirement."""
+    specs = list(requirement.specifier)
+    if len(specs) != 1 or specs[0].operator != "==":
+        raise AssertionError(f"CI dependency must be exactly pinned: {requirement}")
+    return specs[0].version
+
+
+def _validate_dependency_contract(
+    app: list[Requirement], ci_requirements: list[Requirement]
+) -> None:
+    """Reject missing, duplicate, unpinned, or incompatible CI dependencies."""
+    ci = {}
+    for requirement in ci_requirements:
+        name = canonicalize_name(requirement.name)
+        if name in ci:
+            raise AssertionError(f"Duplicate CI dependency: {name}")
+        ci[name] = requirement
+
+    for requirement in app:
+        name = canonicalize_name(requirement.name)
+        if name not in ci:
+            raise AssertionError(f"requirements-ci.txt is missing {name}")
+        pin = _exact_pin(ci[name])
+        if not requirement.specifier.contains(pin, prereleases=True):
+            raise AssertionError(
+                f"CI pin {ci[name]} is incompatible with {requirement}"
+            )
+
+
 class CIWorkflowContractTest(unittest.TestCase):
     def test_third_party_actions_are_pinned_to_full_commit_sha(self):
         text = WORKFLOW.read_text(encoding="utf-8")
@@ -83,6 +113,7 @@ class CIWorkflowContractTest(unittest.TestCase):
         self.assertRegex(
             setup_python, r'(?m)^          python-version:\s*"3\.11"\s*$'
         )
+        self.assertRegex(setup_python, r"(?m)^          cache:\s*pip\s*$")
         self.assertRegex(
             setup_python,
             r"(?m)^          cache-dependency-path:\s*requirements-ci\.txt\s*$",
@@ -97,35 +128,36 @@ class CIDependencyContractTest(unittest.TestCase):
         self.assertTrue(requirements)
         for requirement in requirements:
             with self.subTest(requirement=str(requirement)):
-                specs = list(requirement.specifier)
-                self.assertEqual(len(specs), 1)
-                self.assertEqual(
-                    specs[0].operator,
-                    "==",
-                    "CI dependency 必須使用 == 固定版本",
-                )
+                _exact_pin(requirement)
 
     def test_ci_lock_covers_compatible_application_dependencies(self):
         """Every direct application dependency must have a compatible CI pin."""
-        app = _requirements(APP_REQUIREMENTS)
-        ci = {
-            canonicalize_name(requirement.name): requirement
-            for requirement in _requirements(CI_REQUIREMENTS)
-        }
+        _validate_dependency_contract(
+            _requirements(APP_REQUIREMENTS), _requirements(CI_REQUIREMENTS)
+        )
 
-        for requirement in app:
-            name = canonicalize_name(requirement.name)
-            with self.subTest(requirement=str(requirement)):
-                self.assertIn(name, ci, f"requirements-ci.txt 缺少 {name}")
-                pin_specs = list(ci[name].specifier)
-                self.assertEqual(len(pin_specs), 1)
-                self.assertEqual(pin_specs[0].operator, "==")
-                self.assertTrue(
-                    requirement.specifier.contains(
-                        pin_specs[0].version, prereleases=True
-                    ),
-                    f"CI pin {ci[name]} 不符合應用程式需求 {requirement}",
-                )
+    def test_dependency_contract_rejects_unpinned_ci_dependency(self):
+        with self.assertRaisesRegex(AssertionError, "exactly pinned"):
+            _validate_dependency_contract(
+                [Requirement("numpy>=2.0")], [Requirement("numpy>=2.4")]
+            )
+
+    def test_dependency_contract_rejects_missing_ci_dependency(self):
+        with self.assertRaisesRegex(AssertionError, "missing numpy"):
+            _validate_dependency_contract([Requirement("numpy>=2.0")], [])
+
+    def test_dependency_contract_rejects_duplicate_ci_dependency(self):
+        with self.assertRaisesRegex(AssertionError, "Duplicate CI dependency"):
+            _validate_dependency_contract(
+                [Requirement("numpy>=2.0")],
+                [Requirement("numpy==2.4.6"), Requirement("NumPy==2.4.6")],
+            )
+
+    def test_dependency_contract_rejects_incompatible_ci_pin(self):
+        with self.assertRaisesRegex(AssertionError, "incompatible"):
+            _validate_dependency_contract(
+                [Requirement("numpy>=2.0")], [Requirement("numpy==1.26.4")]
+            )
 
 
 if __name__ == "__main__":
