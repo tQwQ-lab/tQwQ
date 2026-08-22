@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/brand/readme-header.png" alt="tQwQ — Ideas in. Evidence out." width="100%">
+</p>
+
 # tQwQ — a Taiwan-equity backtest engine that tries to stop you lying to yourself
 
 Most of the effort in this repository is not spent finding signals. It is spent
